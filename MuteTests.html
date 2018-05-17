@@ -6,11 +6,11 @@
     <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" >
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" ></script>
-    <script src="tableau.extensions.0.12.latest.js"></script>
+    <script src="https://brianrushton.github.io/MuteTests/tableau.extensions.0.12.latest.js"></script>
   </head>
   <body>
       <div tabindex="-1" role="dialog" class="ui-dialog ui-corner-all ui-widget ui-widget-content ui-front no-close ui-draggable" aria-describedby="MutingForm" aria-labelledby="ui-id-1" style="position: fixed; left: 0px; top: 0px; height: auto; width: 100%; display: block;">
-          <!-- <div id="MutingForm" style="min-width: 980px; width: auto; min-height: 30px; max-height: 30px; height: auto;" class="ui-dialog-content ui-widget-content"> -->
+          <div id="MutingForm" style="min-width: 980px; width: auto; min-height: 30px; max-height: 30px; height: auto;" class="ui-dialog-content ui-widget-content">
               <form id="theForm" name="theForm" method="post" action="" target="targetiframe">
                   <input type="hidden" value="" name="testcaseids" id="testcaseids">
                   <input type="hidden" value="" name="resultids" id="resultids">
@@ -25,7 +25,7 @@
                     <button type="button" id="analyze" onclick="analyzeSelectedTests()" class="ui-button ui-corner-all ui-widget" title="Select tests, branches and enter bug id to analyze" style="margin-left: 10px;">Analyze</button>                   
                   </div>
               </form>
-          <!-- </div> -->
+          </div>
       </div>
       <script>
             "use strict";
