@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Muting Extension</title>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" >
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" ></script>
+    <script src="tableau.extensions.0.12.latest.js"></script>
+  </head>
+  <body>
+      <div tabindex="-1" role="dialog" class="ui-dialog ui-corner-all ui-widget ui-widget-content ui-front no-close ui-draggable" aria-describedby="MutingForm" aria-labelledby="ui-id-1" style="position: fixed; left: 0px; top: 0px; height: auto; width: 100%; display: block;">
+          <!-- <div id="MutingForm" style="min-width: 980px; width: auto; min-height: 30px; max-height: 30px; height: auto;" class="ui-dialog-content ui-widget-content"> -->
+              <form id="theForm" name="theForm" method="post" action="" target="targetiframe">
+                  <input type="hidden" value="" name="testcaseids" id="testcaseids">
+                  <input type="hidden" value="" name="resultids" id="resultids">
+                  <div class="ui-dialog-buttonset" style="float: none;">
+                    <label>Mute Selected Tests</label>  
+                    <br/>
+                    Bug Id: <input type="number" id="bugid" name="bugid" min="0" step="1" size=20 width=20 style="margin-left: 10px;">
+                    <br/>
+                    <button type="button" id="mute" onclick="muteSelectedTests()" class="ui-button ui-corner-all ui-widget" title="Select tests, branches and enter bug id to mute" style="margin-left: 10px;">Mute</button>
+                    <button type="button" id="unmute" onclick="unmuteSelectedTests()" class="ui-button ui-corner-all ui-widget" title="Select tests to unmute them across all or selected branches" style="margin-left: 10px;">Un-Mute</button>
+                    <br/>
+                    <button type="button" id="analyze" onclick="analyzeSelectedTests()" class="ui-button ui-corner-all ui-widget" title="Select tests, branches and enter bug id to analyze" style="margin-left: 10px;">Analyze</button>                   
+                  </div>
+              </form>
+          <!-- </div> -->
+      </div>
+      <script>
+            "use strict";
+            var resultsWorksheet = ""
+            var actionPromises = []
+            var selectedTests = []
+            var selectedResults = []
+            var branchName = ""
+            var branchId = ""
+            
+            tableau.extensions.initializeAsync().then(function () {
+                console.log(tableau.extensions.environment);
+                let worksheets = tableau.extensions.dashboardContent.dashboard.worksheets
+                console.log(worksheets)
+
+                // TODO: How should we pick which worksheet to use? (Maybe it doesn't matter as long as the filters are right?
+                resultsWorksheet = worksheets[0];
+                console.log("Using worksheet: " + resultsWorksheet.name)
+            }, function (err) {
+                console.log("Error loading muting extension: " + err);
+            });
+
+            function findTestCaseIds() {
+                let dfd = new $.Deferred();
+                resultsWorksheet.getSelectedMarksAsync().then((marks) => {
+                    selectedTests = getTableValues(marks, "Test Case Id")
+                    dfd.resolve(selectedTests);
+                })
+                .catch(() => { dfd.resolve() });
+                return dfd.promise();
+            }
+
+            function findTestResultIds() {
+                let dfd = new $.Deferred();
+                resultsWorksheet.getSelectedMarksAsync().then((marks) => {
+                    let testResultIds = getTableValues(marks, "ATTR(Test Result Id)")
+                    selectedResults = getUniqueList(testResultIds)
+                    dfd.resolve(selectedResults);
+                })
+                .catch(() => { dfd.resolve() });
+                return dfd.promise();
+            }
+
+            function getUniqueList(listWithDuplicates) {
+                // There doesn't seem to be a "set" class, so faking it:
+                let uniqueSet = {}
+                for (let item of listWithDuplicates) {
+                    uniqueSet[item] = true
+                }
+                let uniqueList = []
+                for (let item in uniqueSet) {
+                    uniqueList.push(item)
+                }
+                return uniqueList
+            }
+
+            // Get the values for the given property from the table of selected marks
+            function getTableValues(marks, propertyName)
+            {
+                console.log("Marks in selection:")
+                console.log(marks);
+                let dataTable = marks.data[0]
+                let columnField = dataTable.columns.find((column) => (column.fieldName == propertyName))
+                let columnTableIndex = columnField.index
+
+                let values = []
+                for (let i in dataTable.data) {
+                    let columnValues = dataTable.data[i]
+                    let value = columnValues[columnTableIndex].value
+                    values.push(value)
+                }
+                return values
+            }
+
+            function findBranchName() {
+                let dfd = new $.Deferred();
+                resultsWorksheet.getFiltersAsync().then((filters) => {
+                    let branchFilter = filters.find((filter) => filter.fieldName=="Branch Name");
+                    branchName = branchFilter.appliedValues[0].value; 
+                    console.log("Using branch: " + branchName)
+                    dfd.resolve(branchName);
+                })
+                .catch(() => { dfd.resolve() });  
+                return dfd.promise();
+            }
+
+            function findBranchId() {
+                let dfd = new $.Deferred();
+                $.ajax({
+                    url: "http://tabautoserver/BulkAnalyze/Muting/GetBranches",
+                    data: {
+                        "selectedTestIds": selectedTests.toString()
+                    },
+                    type: 'GET',
+                    dataType: 'json',
+                    success: (idNamePairList) => {
+                        // The response "idNamePairList" is a string representation of a bunch of branches and IDs, formatted like this:
+                        //   id1:name1,id2:name2,...
+                        // We only want the ID of the branch we decided on already.
+                        for (let idNamePair of idNamePairList.split(',')) {
+                            let properties = idNamePair.split(':');
+                            let thisBranchId = properties[0]
+                            let thisBranchName = properties[1]
+
+                            if (thisBranchName == branchName) {
+                                branchId = thisBranchId
+                                break;
+                            }
+                        }
+                        dfd.resolve(branchId);
+                    },
+                    error: (request, message, error) => {
+                        console.log("Error getting branch IDs")
+                        console.log(error)
+                        showMessage("Error getting branch IDs\n" + message + "\n" + error)
+                        dfd.resolve();                   
+                    }
+                });
+                return dfd.promise();
+            }
+
+            function muteSelectedTests() {
+                findTestCaseIds()
+                .then(() => findBranchName())
+                .then(() => findBranchId())
+                .then(() => {
+                    let bugid = document.getElementById("bugid").value;
+                    if (parseInt(bugid) == 0) {                   
+                        showMessage("Please enter a bug ID");
+                    } else if (selectedTests.length == 0) {
+                        showMessage("Please select tests to mute")
+                    } else if (branchId.length == "") {
+                        showMessage("Could find branch ID for selected tests")
+                    } else {
+                        let url = "http://tabautoserver/BulkAnalyze/Muting/MuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName + "&bugId=" + bugid
+                        console.log("URL: " + url);
+
+                        $.ajax({
+                            type: 'POST',
+                            url: url,
+                            dataType: 'json',
+                            success: (response) => {
+                                showMessage(response)
+                            },
+                            error: (request, message, error) => {
+                                showMessage("Failed to mute tests\n " + error + "\n" + message)
+                            }
+                        });
+                    }
+                })
+                .catch((error) => {
+                    console.log("Failure muting tests")
+                    console.log(error)
+                    showMessage("Something's busted:\n " + error.message) 
+                });
+            }
+
+            function unmuteSelectedTests() {
+                findTestCaseIds()
+                .then(() => findBranchName())
+                .then(() => findBranchId())
+                .then(() => {
+                    if (selectedTests.length == 0) {
+                        showMessage("Please select tests to unmute")
+                    } else {
+                        let url = "http://tabautoserver/BulkAnalyze/Muting/UnmuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName
+                        console.log("URL: " + url);
+
+                        $.ajax({
+                            type: 'POST',
+                            url: url,
+                            dataType: 'json',
+                            success: function (response) {
+                                showMessage(response)
+                            },
+                            error: function (request, message, error) {
+                                showMessage("Failed to unmute tests\n " + error)                          
+                            }
+                        });
+                    }
+                })
+                .catch((error) => {
+                    console.log("Failure unmuting tests")
+                    console.logG(error)
+                });
+            }
+
+            function analyzeSelectedTests() {
+                findTestResultIds().then(() => {
+                    let bugid = document.getElementById("bugid").value;
+
+                    if (selectedResults.length == 0) {
+                        showMessage("Please select results to analyze")
+                    } else if (parseInt(bugid) == 0) {                   
+                        showMessage("Please enter a bug ID");
+                    } else {
+                        let url = "http://tabautoserver/BulkAnalyze/Muting/AnalyzeFailures?resultIds=" + selectedResults.toString() + "&bugIdString=" + bugid
+                        console.log("URL: " + url);
+
+                        $.ajax({
+                            type: 'POST',
+                            url: url,
+                            dataType: 'json',
+                            success: function (response) {
+                                showMessage(response)
+                            },
+                            error: function (request, message, error) {
+                                showMessage("Failed to analyze results\n " + error)     
+                            }
+                        });
+                    }
+                })
+                .catch((error) => {
+                    console.log("Failure analyzing results")
+                    console.logG(error)
+                });
+            }
+
+            function showMessage(message) {
+                let cleanMessage = message.replace(/<br \/>/g, "\n")
+
+                // TODO: Can we use a relative path?
+                let popupUrl = "https://brianrushton.github.io/MuteTests/MuteTestsPopup.html"
+                tableau.extensions.ui.displayDialogAsync(popupUrl, cleanMessage, { height: 500, width: 500 }).then((payload) => {
+                    // nothing to do for now
+                }).catch((error) => {
+                    switch(error.errorCode) {
+                        case tableau.ErrorCodes.DialogClosedByUser:
+                            // This just means they hit the close box
+                            break;
+                        default:
+                            console.error(error.message);
+                    }
+                });
+            }
+
+      </script>
+</html>
