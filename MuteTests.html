@@ -115,7 +115,7 @@
             function findBranchId() {
                 let dfd = new $.Deferred();
                 $.ajax({
-                    url: "http://tabautoserver/BulkAnalyze/Muting/GetBranches",
+                    url: "https://tabautoserver/BulkAnalyze/Muting/GetBranches",
                     data: {
                         "selectedTestIds": selectedTests.toString()
                     },
@@ -160,7 +160,7 @@
                     } else if (branchId.length == "") {
                         showMessage("Could find branch ID for selected tests")
                     } else {
-                        let url = "http://tabautoserver/BulkAnalyze/Muting/MuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName + "&bugId=" + bugid
+                        let url = "https://tabautoserver/BulkAnalyze/Muting/MuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName + "&bugId=" + bugid
                         console.log("URL: " + url);
 
                         $.ajax({
@@ -191,7 +191,7 @@
                     if (selectedTests.length == 0) {
                         showMessage("Please select tests to unmute")
                     } else {
-                        let url = "http://tabautoserver/BulkAnalyze/Muting/UnmuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName
+                        let url = "https://tabautoserver/BulkAnalyze/Muting/UnmuteTests?testIds=" + selectedTests.toString() + "&branchIds=" + branchId + "&branchNames=" + branchName
                         console.log("URL: " + url);
 
                         $.ajax({
@@ -222,7 +222,7 @@
                     } else if (parseInt(bugid) == 0) {                   
                         showMessage("Please enter a bug ID");
                     } else {
-                        let url = "http://tabautoserver/BulkAnalyze/Muting/AnalyzeFailures?resultIds=" + selectedResults.toString() + "&bugIdString=" + bugid
+                        let url = "https://tabautoserver/BulkAnalyze/Muting/AnalyzeFailures?resultIds=" + selectedResults.toString() + "&bugIdString=" + bugid
                         console.log("URL: " + url);
 
                         $.ajax({
